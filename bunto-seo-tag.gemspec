@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.authors       = ['Ben Balter', 'Suriyaa Kudo']
   spec.email         = ['ben.balter@github.com', 'SuriyaaKudoIsc@users.noreply.github.com']
   spec.summary       = "A Bunto plugin to add metadata tags for search engines and social networks to better index and display your site's content."
-  spec.homepage      = 'https://github.com/benbalter/bunto-seo-tag'
+  spec.homepage      = 'https://github.com/bunto/bunto-seo-tag'
   spec.license       = 'MIT'
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
