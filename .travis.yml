@@ -1,8 +1,12 @@
 # Travis CI
 rvm:
   - 2.2.3
-before_install: gem install bundler
 langauage: ruby
+before_script:
+  - chmod a+x script/bootstrap
+  - chmod a+x script/cibuild
+  - chmod a+x script/release
+  - gem install bundler
 script: script/cibuild
 sudo: false
 cache: bundler
