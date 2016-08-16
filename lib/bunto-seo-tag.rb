@@ -30,6 +30,7 @@ module Bunto
       {
         'page'    => context.registers[:page],
         'site'    => context.registers[:site].site_payload['site'],
+        'paginator' => context['paginator'],
         'seo_tag' => options
       }
     end
@@ -40,8 +41,8 @@ module Bunto
 
     def info
       {
-        registers: context.registers,
-        filters: [Bunto::Filters, BuntoSeoTag::Filters]
+        :registers => context.registers,
+        :filters => [Bunto::Filters, BuntoSeoTag::Filters]
       }
     end
 

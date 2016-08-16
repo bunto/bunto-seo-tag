@@ -4,12 +4,13 @@ describe Bunto::SeoTag do
   let(:page)      { make_page }
   let(:site)      { make_site }
   let(:post)      { make_post }
-  let(:context)   { make_context(page: page, site: site) }
+  let(:context)   { make_context(:page => page, :site => site) }
   let(:tag)       { 'seo' }
   let(:text)      { '' }
   let(:output)    { Liquid::Template.parse("{% #{tag} #{text} %}").render!(context, {}) }
-  let(:json)      { output.match(%r{<script type=\"application/ld\+json\">(.*)</script>}m)[1] }
+  let(:json)      { output.match(%r!<script type=\"application/ld\+json\">(.*)</script>!m)[1] }
   let(:json_data) { JSON.parse(json) }
+  let(:paginator) { { 'previous_page' => true, 'previous_page_path' => 'foo', 'next_page' => true, 'next_page_path' => 'bar' } }
 
   before do
     Bunto.logger.log_level = :error
@@ -24,12 +25,22 @@ describe Bunto::SeoTag do
     expect(output).to match(/Bunto SEO tag v#{version}/i)
   end
 
+  it 'outputs valid HTML' do
+    site.process
+    options = {
+      :check_html => true,
+      :checks_to_ignore => %w(ScriptCheck LinkCheck ImageCheck)
+    }
+    status = HTML::Proofer.new(dest_dir, options).run
+    expect(status).to eql(true)
+  end
+
   context 'with page.title' do
     let(:page) { make_page('title' => 'foo') }
 
     it 'builds the title with a page title only' do
-      expect(output).to match(%r{<title>foo</title>})
-      expected = %r{<meta property="og:title" content="foo" />}
+      expect(output).to match(%r!<title>foo</title>!)
+      expected = %r!<meta property="og:title" content="foo" />!
       expect(output).to match(expected)
     end
 
@@ -37,7 +48,7 @@ describe Bunto::SeoTag do
       let(:site) { make_site('title' => 'bar') }
 
       it 'builds the title with a page title and site title' do
-        expect(output).to match(%r{<title>foo - bar</title>})
+        expect(output).to match(%r!<title>foo - bar</title>!)
       end
     end
   end
@@ -46,7 +57,7 @@ describe Bunto::SeoTag do
     let(:site) { make_site('title' => 'Site title') }
 
     it 'builds the title with only a site title' do
-      expect(output).to match(%r{<title>Site title</title>})
+      expect(output).to match(%r!<title>Site title</title>!)
     end
   end
 
@@ -54,8 +65,8 @@ describe Bunto::SeoTag do
     let(:page) { make_page('description' => 'foo') }
 
     it 'uses the page description' do
-      expect(output).to match(%r{<meta name="description" content="foo" />})
-      expect(output).to match(%r{<meta property="og:description" content="foo" />})
+      expect(output).to match(%r!<meta name="description" content="foo" />!)
+      expect(output).to match(%r!<meta property="og:description" content="foo" />!)
     end
   end
 
@@ -63,8 +74,8 @@ describe Bunto::SeoTag do
     let(:page) { make_page('excerpt' => 'foo') }
 
     it 'uses the page excerpt when no page description exists' do
-      expect(output).to match(%r{<meta name="description" content="foo" />})
-      expect(output).to match(%r{<meta property="og:description" content="foo" />})
+      expect(output).to match(%r!<meta name="description" content="foo" />!)
+      expect(output).to match(%r!<meta property="og:description" content="foo" />!)
     end
   end
 
@@ -72,8 +83,8 @@ describe Bunto::SeoTag do
     let(:site) { make_site('description' => 'foo') }
 
     it 'uses the site description when no page description nor excerpt exist' do
-      expect(output).to match(%r{<meta name="description" content="foo" />})
-      expect(output).to match(%r{<meta property="og:description" content="foo" />})
+      expect(output).to match(%r!<meta name="description" content="foo" />!)
+      expect(output).to match(%r!<meta property="og:description" content="foo" />!)
     end
   end
 
@@ -81,9 +92,9 @@ describe Bunto::SeoTag do
     let(:site) { make_site('url' => 'http://example.invalid') }
 
     it 'uses the site url to build the seo url' do
-      expected = %r{<link rel="canonical" href="http://example.invalid/page.html" />}
+      expected = %r!<link rel="canonical" href="http://example.invalid/page.html" />!
       expect(output).to match(expected)
-      expected = %r{<meta property="og:url" content="http://example.invalid/page.html" />}
+      expected = %r!<meta property="og:url" content="http://example.invalid/page.html" />!
       expect(output).to match(expected)
     end
 
@@ -91,10 +102,10 @@ describe Bunto::SeoTag do
       let(:page) { make_page('permalink' => '/page/index.html') }
 
       it "uses replaces '/index.html' with '/'" do
-        expected = %r{<link rel="canonical" href="http://example.invalid/page/" />}
+        expected = %r!<link rel="canonical" href="http://example.invalid/page/" />!
         expect(output).to match(expected)
 
-        expected = %r{<meta property="og:url" content="http://example.invalid/page/" />}
+        expected = %r!<meta property="og:url" content="http://example.invalid/page/" />!
         expect(output).to match(expected)
       end
     end
@@ -103,19 +114,69 @@ describe Bunto::SeoTag do
       let(:site) { make_site('url' => 'http://example.invalid', 'baseurl' => '/foo') }
 
       it 'uses baseurl to build the seo url' do
-        expected = %r{<link rel="canonical" href="http://example.invalid/foo/page.html" />}
+        expected = %r!<link rel="canonical" href="http://example.invalid/foo/page.html" />!
         expect(output).to match(expected)
-        expected = %r{<meta property="og:url" content="http://example.invalid/foo/page.html" />}
+        expected = %r!<meta property="og:url" content="http://example.invalid/foo/page.html" />!
         expect(output).to match(expected)
       end
     end
 
-    context 'with page.image' do
+    context 'with relative page.image as a string' do
       let(:page) { make_page('image' => '/img/foo.png') }
 
       it 'outputs the image' do
-        expected = %r{<meta property="og:image" content="http://example.invalid/img/foo.png" />}
-        expect(output).to match(expected)
+        expected = '<meta property="og:image" content="http://example.invalid/img/foo.png" />'
+        expect(output).to include(expected)
+      end
+    end
+
+    context 'with absolute page.image' do
+      let(:page) { make_page('image' => 'http://cdn.example.invalid/img/foo.png') }
+
+      it 'outputs the image' do
+        expected = '<meta property="og:image" content="http://cdn.example.invalid/img/foo.png" />'
+        expect(output).to include(expected)
+      end
+    end
+
+    context 'with page.image as an object' do
+      context 'when given a path' do
+        let(:page) { make_page('image' => { 'path' => '/img/foo.png' }) }
+
+        it 'outputs the image' do
+          expected = %r!<meta property="og:image" content="http://example.invalid/img/foo.png" />!
+          expect(output).to match(expected)
+        end
+      end
+
+      context 'when given a facebook image' do
+        let(:page) { make_page('image' => { 'facebook' => '/img/facebook.png' }) }
+
+        it 'outputs the image' do
+          expected = %r!<meta property="og:image" content="http://example.invalid/img/facebook.png" />!
+          expect(output).to match(expected)
+        end
+      end
+
+      context 'when given a twitter image' do
+        let(:page) { make_page('image' => { 'twitter' => '/img/twitter.png' }) }
+
+        it 'outputs the image' do
+          expected = %r!<meta name="twitter:image" content="http://example.invalid/img/twitter.png" />!
+          expect(output).to match(expected)
+        end
+      end
+
+      context 'when given the image height and width' do
+        let(:image) { { 'facebook' => '/img/foo.png', 'height' => 1, 'width' => 2 } }
+        let(:page) { make_page('image' => image) }
+
+        it 'outputs the image' do
+          expected = %r!<meta property="og:image:height" content="1" />!
+          expect(output).to match(expected)
+          expected = %r!<meta property="og:image:width" content="2" />!
+          expect(output).to match(expected)
+        end
       end
     end
 
@@ -127,11 +188,19 @@ describe Bunto::SeoTag do
       end
     end
 
+    context 'with absolute site.logo' do
+      let(:site) { make_site('logo' => 'http://cdn.example.invalid/logo.png', 'url' => 'http://example.invalid') }
+
+      it 'outputs the logo' do
+        expect(json_data['logo']).to eql('http://cdn.example.invalid/logo.png')
+      end
+    end
+
     context 'with site.title' do
       let(:site) { make_site('title' => 'Foo', 'url' => 'http://example.invalid') }
 
       it 'outputs the site title meta' do
-        expect(output).to match(%r{<meta property="og:site_name" content="Foo" />})
+        expect(output).to match(%r!<meta property="og:site_name" content="Foo" />!)
       end
 
       it 'minifies the output' do
@@ -154,9 +223,9 @@ EOS
     let(:site) { make_site('github' => github_namespace) }
 
     it 'uses site.github.url to build the seo url' do
-      expected = %r{<link rel="canonical" href="http://example.invalid/page.html" \/>}
+      expected = %r!<link rel="canonical" href="http://example.invalid/page.html" \/>!
       expect(output).to match(expected)
-      expected = %r{<meta property="og:url" content="http://example.invalid/page.html" />}
+      expected = %r!<meta property="og:url" content="http://example.invalid/page.html" />!
       expect(output).to match(expected)
     end
   end
@@ -174,7 +243,7 @@ EOS
       let(:page) { make_post(meta) }
 
       it 'outputs post meta' do
-        expected = %r{<meta property="og:type" content="article" />}
+        expected = %r!<meta property="og:type" content="article" />!
         expect(output).to match(expected)
 
         expect(json_data['headline']).to eql('post')
@@ -194,6 +263,33 @@ EOS
     end
   end
 
+  context 'facebook' do
+    let(:site_facebook) do
+      {
+        'admins' => 'buntorb-fb-admins',
+        'app_id' => 'buntorb-fb-app_id',
+        'publisher' => 'buntorb-fb-publisher'
+      }
+    end
+
+    let(:site) { make_site('facebook' => site_facebook) }
+
+    it 'outputs facebook admins meta' do
+      expected = %r!<meta property="fb:admins" content="buntorb-fb-admins" />!
+      expect(output).to match(expected)
+    end
+
+    it 'outputs facebook app ID meta' do
+      expected = %r!<meta property="fb:app_id" content="buntorb-fb-app_id" />!
+      expect(output).to match(expected)
+    end
+
+    it 'outputs facebook article publisher meta' do
+      expected = %r!<meta property="article:publisher" content="buntorb-fb-publisher" />!
+      expect(output).to match(expected)
+    end
+  end
+
   context 'twitter' do
     context 'with site.twitter.username' do
       let(:site_twitter) { { 'username' => 'buntorb' } }
@@ -203,13 +299,13 @@ EOS
         let(:page) { make_page('author' => 'benbalter') }
 
         it 'outputs twitter card meta' do
-          expected = %r{<meta name="twitter:card" content="summary" />}
+          expected = %r!<meta name="twitter:card" content="summary" />!
           expect(output).to match(expected)
 
-          expected = %r{<meta name="twitter:site" content="@buntorb" />}
+          expected = %r!<meta name="twitter:site" content="@buntorb" />!
           expect(output).to match(expected)
 
-          expected = %r{<meta name="twitter:creator" content="@benbalter" />}
+          expected = %r!<meta name="twitter:creator" content="@benbalter" />!
           expect(output).to match(expected)
         end
 
@@ -217,7 +313,7 @@ EOS
           let(:page) { make_page('author' => '@benbalter') }
 
           it 'outputs the twitter card' do
-            expected = %r{<meta name="twitter:creator" content="@benbalter" />}
+            expected = %r!<meta name="twitter:creator" content="@benbalter" />!
             expect(output).to match(expected)
           end
         end
@@ -230,14 +326,14 @@ EOS
           context 'with the author in site.data.authors' do
             let(:author_data) { { 'benbalter' => { 'twitter' => 'test' } } }
             it 'outputs the twitter card' do
-              expected = %r{<meta name="twitter:creator" content="@test" />}
+              expected = %r!<meta name="twitter:creator" content="@test" />!
               expect(output).to match(expected)
             end
           end
 
           context 'without the author in site.data.authors' do
             it 'outputs the twitter card' do
-              expected = %r{<meta name="twitter:creator" content="@benbalter" />}
+              expected = %r!<meta name="twitter:creator" content="@benbalter" />!
               expect(output).to match(expected)
             end
           end
@@ -248,7 +344,7 @@ EOS
         let(:page) { make_page('image' => '/img/foo.png') }
 
         it 'outputs summary card with large image' do
-          expected = %r{<meta name="twitter:card" content="summary_large_image" />}
+          expected = %r!<meta name="twitter:card" content="summary_large_image" />!
           expect(output).to match(expected)
         end
       end
@@ -257,7 +353,7 @@ EOS
         let(:page) { make_page('author' => { 'twitter' => '@test' }) }
 
         it 'supports author data as a hash' do
-          expected = %r{<meta name="twitter:creator" content="@test" />}
+          expected = %r!<meta name="twitter:creator" content="@test" />!
           expect(output).to match(expected)
         end
       end
@@ -266,7 +362,7 @@ EOS
         let(:page) { make_page('authors' => %w(test foo)) }
 
         it 'supports author data as an array' do
-          expected = %r{<meta name="twitter:creator" content="@test" />}
+          expected = %r!<meta name="twitter:creator" content="@test" />!
           expect(output).to match(expected)
         end
       end
@@ -276,7 +372,7 @@ EOS
         let(:site) { make_site('author' => author, 'twitter' => site_twitter) }
 
         it 'supports author data as an hash' do
-          expected = %r{<meta name="twitter:creator" content="@test" />}
+          expected = %r!<meta name="twitter:creator" content="@test" />!
           expect(output).to match(expected)
         end
       end
@@ -327,7 +423,7 @@ EOS
     let(:site) { make_site('name' => 'Site name') }
 
     it 'uses site.name if site.title is not present' do
-      expected = %r{<meta property="og:site_name" content="Site name" />}
+      expected = %r!<meta property="og:site_name" content="Site name" />!
       expect(output).to match(expected)
     end
 
@@ -335,7 +431,7 @@ EOS
       let(:site)  { make_site('name' => 'Site Name', 'title' => 'Site Title') }
 
       it 'uses site.tile if both site.title and site.name are present' do
-        expected = %r{<meta property="og:site_name" content="Site Title" />}
+        expected = %r!<meta property="og:site_name" content="Site Title" />!
         expect(output).to match(expected)
       end
     end
@@ -349,13 +445,12 @@ EOS
     end
   end
 
-  it 'outputs valid HTML' do
-    site.process
-    options = {
-      check_html: true,
-      checks_to_ignore: %w(ScriptCheck LinkCheck ImageCheck)
-    }
-    status = HTML::Proofer.new(dest_dir, options).run
-    expect(status).to eql(true)
+  context 'with pagination' do
+    let(:context) { make_context({}, 'paginator' => paginator) }
+
+    it 'outputs pagination links' do
+      expect(output).to match(/<link rel="prev" href="foo">/)
+      expect(output).to match(/<link rel="next" href="bar">/)
+    end
   end
 end
