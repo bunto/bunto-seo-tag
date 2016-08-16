@@ -10,3 +10,7 @@ before_script:
 script: script/cibuild
 sudo: false
 cache: bundler
+env:
+  - ""
+  - BUNTO_VERSION=3.2.1
+  - BUNTO_VERSION=3.0.0
