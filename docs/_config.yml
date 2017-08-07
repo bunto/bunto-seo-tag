@@ -4,7 +4,7 @@ description: A Bunto plugin to add metadata tags for search engines and social n
 permalink: pretty
 
 gems:
-  - bunto-seo-tag
-  - bunto-sitemap
+  - jekyll-seo-tag
+  - jekyll-sitemap
 
-theme: bunto-theme-primer
+theme: jekyll-theme-primer
