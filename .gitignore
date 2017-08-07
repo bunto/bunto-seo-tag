@@ -7,4 +7,6 @@
 /pkg/
 /spec/reports/
 /tmp/
+/bin/
 *.gem
+_site

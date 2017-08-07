@@ -1,16 +1,7 @@
-# Travis CI
-language: ruby
 rvm:
-  - 2.3.1
-before_script:
-  - chmod a+x script/bootstrap
-  - chmod a+x script/cibuild
-  - chmod a+x script/release
-  - gem install bundler
+  - 2.2.3
+before_install: gem install bundler
+language: ruby
 script: script/cibuild
 sudo: false
 cache: bundler
-env:
-  - ""
-  - BUNTO_VERSION=3.2.1
-  - BUNTO_VERSION=3.0.0

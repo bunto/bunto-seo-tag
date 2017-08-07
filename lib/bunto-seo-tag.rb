@@ -1,11 +1,24 @@
-require 'bunto-seo-tag/filters'
-require 'bunto-seo-tag/version'
+require "bunto"
+require "bunto-seo-tag/version"
 
 module Bunto
   class SeoTag < Liquid::Tag
+    autoload :JSONLD,  "bunto-seo-tag/json_ld"
+    autoload :Drop,    "bunto-seo-tag/drop"
+    autoload :Filters, "bunto-seo-tag/filters"
+
     attr_accessor :context
 
-    MINIFY_REGEX = /([>,]\n|[%}]})\s+?(<|{[{%]|[ ]+\")/
+    # Matches all whitespace that follows either
+    #   1. A '}', which closes a Liquid tag
+    #   2. A '{', which opens a JSON block
+    #   3. A '>' followed by a newline, which closes an XML tag or
+    #   4. A ',' followed by a newline, which ends a JSON line
+    # We will strip all of this whitespace to minify the template
+    # We will not strip any whitespace if the next character is a '-'
+    #   so that we do not interfere with the HTML comment at the
+    #   very begining
+    MINIFY_REGEX = %r!(?<=[{}]|[>,]\n)\s+(?\!-)!
 
     def initialize(_tag_name, text, _tokens)
       super
@@ -21,28 +34,28 @@ module Bunto
 
     def options
       {
-        'version' => Bunto::SeoTag::VERSION,
-        'title'   => title?
+        "version" => Bunto::SeoTag::VERSION,
+        "title"   => title?,
       }
     end
 
     def payload
       {
-        'page'    => context.registers[:page],
-        'site'    => context.registers[:site].site_payload['site'],
-        'paginator' => context['paginator'],
-        'seo_tag' => options
+        "page"      => context.registers[:page],
+        "site"      => context.registers[:site].site_payload["site"],
+        "paginator" => context["paginator"],
+        "seo_tag"   => drop,
       }
     end
 
-    def title?
-      !(@text =~ /title=false/i)
+    def drop
+      @drop ||= Bunto::SeoTag::Drop.new(@text, @context)
     end
 
     def info
       {
         :registers => context.registers,
-        :filters => [Bunto::Filters, BuntoSeoTag::Filters]
+        :filters   => [Bunto::Filters],
       }
     end
 
@@ -52,16 +65,16 @@ module Bunto
 
     def template_contents
       @template_contents ||= begin
-        File.read(template_path).gsub(MINIFY_REGEX, '\1\2').chomp
+        File.read(template_path).gsub(MINIFY_REGEX, "")
       end
     end
 
     def template_path
       @template_path ||= begin
-        File.expand_path './template.html', File.dirname(__FILE__)
+        File.expand_path "./template.html", File.dirname(__FILE__)
       end
     end
   end
 end
 
-Liquid::Template.register_tag('seo', Bunto::SeoTag)
+Liquid::Template.register_tag("seo", Bunto::SeoTag)

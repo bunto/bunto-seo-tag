@@ -6,11 +6,19 @@ Metrics/LineLength:
     - spec/**/*
     - bunto-seo-tag.gemspec
 
+Metrics/BlockLength:
+  Exclude:
+    - spec/**/*
+
 Style/Documentation:
   Enabled: false
 
 Style/FileName:
   Enabled: false
+
+Style/IndentHeredoc:
+  Exclude:
+    - spec/**/*
 
 AllCops:
   Exclude:
